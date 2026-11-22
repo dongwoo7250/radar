@@ -1,4 +1,4 @@
-# 업비트 일봉 데이터를 받아 52주 최고 종가·역사적 최고 종가를 계산해 data.json으로 저장
+# 업비트 일봉 데이터를 받아 52주 최고가·역사적 최고가(일봉 고가 기준)를 계산해 data.json으로 저장
 # GitHub Actions에서 하루 한 번(09:07 KST) 실행됨. 표준 라이브러리만 사용.
 import json, os, time, datetime, urllib.request, urllib.error
 
@@ -61,8 +61,10 @@ def main():
             for k in got:
                 d = dnum(k['candle_date_time_utc'])
                 if d < T:
-                    closes[d] = k['trade_price']
+                    closes[d] = k['high_price']
             o = old.get(m)
+            if o and o.get('hv') != 1:  # 예전(종가 기준) 데이터는 버리고 다시 계산
+                o = None
             if full:
                 first = dnum(got[-1]['candle_date_time_utc']) if got else T
                 ath_c, ath_d = 0, None
@@ -80,8 +82,8 @@ def main():
                 while True:
                     arr = candles(m, 200, to)
                     for k in arr:
-                        if k['trade_price'] > ath_c:
-                            ath_c, ath_d = k['trade_price'], dnum(k['candle_date_time_utc'])
+                        if k['high_price'] > ath_c:
+                            ath_c, ath_d = k['high_price'], dnum(k['candle_date_time_utc'])
                     if arr:
                         first = dnum(arr[-1]['candle_date_time_utc'])
                         to = arr[-1]['candle_date_time_utc'] + 'Z'
@@ -97,7 +99,7 @@ def main():
             h2, h2d = mx(T - 363)   # 내일 기준(어제 종가 추가 전) 대비용
             ev = x.get('market_event') or {}
             warn = 1 if (x.get('market_warning') == 'CAUTION' or ev.get('warning')) else 0
-            res[m] = {'n': x.get('korean_name', m), 'w': warn, 'f': first,
+            res[m] = {'hv': 1, 'n': x.get('korean_name', m), 'w': warn, 'f': first,
                       'h1': h1, 'h1d': h1d, 'h2': h2, 'h2d': h2d, 'a': ath_c, 'ad': ath_d}
         except Exception as e:
             print('skip', m, e)
